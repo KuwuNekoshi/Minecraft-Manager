@@ -16,7 +16,7 @@ src/
   services/            # Crafty API client
   utils/               # Formatting and helper utilities
   config.js            # Environment variable validation and config
-  deploy-commands.js   # One-time slash command deployment
+  deploy-commands.js   # Manual slash command deployment helper
   index.js             # Runtime entrypoint
 ```
 
@@ -27,14 +27,17 @@ src/
    npm install
    ```
 2. Copy `.env.example` to `.env` and fill in your values.
-3. Deploy slash commands to your guild:
-   ```bash
-   npm run deploy:commands
-   ```
-4. Start the bot:
+3. Start the bot (it clears old guild commands and re-registers current commands on startup):
    ```bash
    npm start
    ```
+
+
+You can still run manual deployment if needed:
+
+```bash
+npm run deploy:commands
+```
 
 ## Crafty API notes
 
