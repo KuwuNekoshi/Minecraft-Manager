@@ -1,5 +1,6 @@
 import { Collection, Events } from 'discord.js';
 import { commands as commandList } from '../commands/index.js';
+import { config } from '../config.js';
 
 export function registerCommandHandlers(client) {
   client.commands = new Collection();
@@ -35,4 +36,15 @@ export function registerCommandHandlers(client) {
 
 export function getSlashCommandJson() {
   return commandList.map((command) => command.data.toJSON());
+}
+
+export async function resetAndRegisterSlashCommands(client) {
+  const guild = await client.guilds.fetch(config.discordGuildId);
+  const commands = getSlashCommandJson();
+
+  console.log(`Clearing existing slash commands for guild ${config.discordGuildId}...`);
+  await guild.commands.set([]);
+
+  console.log(`Registering ${commands.length} slash commands for guild ${config.discordGuildId}...`);
+  await guild.commands.set(commands);
 }
