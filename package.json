@@ -1,0 +1,19 @@
+{
+  "name": "minecraft-manager-bot",
+  "version": "1.0.0",
+  "description": "Discord slash-command bot for Crafty Controller server overviews",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy:commands": "node src/deploy-commands.js",
+    "lint:check": "node --check src/index.js && node --check src/deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.17.3",
+    "dotenv": "^16.4.7"
+  }
+}
