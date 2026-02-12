@@ -87,12 +87,11 @@ const buildServerField = (server, stats) => {
   const players = toPlayers(stats.players);
 
   return {
-    name: `${server.name} | ${version}`,
+    name: `${dot} ${server.name} | ${version}`,
     value: [
-      `**IP:** ||\`${ip}\`||`,
-      `**Status** ${dot} ${text}`,
-      `${online}/${max} Online`,
-      '**Players online:**',
+      `**Status:** ${text}`,
+      `**IP:** \`${ip}\``,
+      `**${online}/${max} Players online:**`,
       players.length > 0 ? players.map((player) => `• ${player}`).join('\n') : '• Ingen spillere online'
     ].join('\n')
   };

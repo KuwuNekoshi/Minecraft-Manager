@@ -5,6 +5,7 @@ A Discord slash-command bot that gives a quick overview of your Crafty Controlle
 ## Features
 
 - `/servers` posts an embed-only Megamonner overview with server IP mapping, status (online/offline/updating/crashed), version, player counts, and online player names.
+- `/whitelist` manages server whitelist state with subcommands (`enable`, `disable`, `list`, `add`, `remove`) and autocomplete for server selection (plus whitelist-player autocomplete on remove).
 - Deployment tooling now clears old guild slash commands before re-registering, so removed commands do not linger.
 
 ## Project structure
@@ -45,6 +46,8 @@ This bot expects Crafty v2 API auth via bearer token and requests:
 
 - `GET /api/v2/servers`
 - `GET /api/v2/servers/{serverId}/stats`
+- `POST /api/v2/servers/{serverId}/stdin`
+- `GET /api/v2/servers/{serverId}/logs`
 
 Because Crafty fields can vary between versions, the bot normalizes multiple possible field names for:
 
