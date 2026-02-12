@@ -73,17 +73,36 @@ const extractServerArray = (payload) => {
   return [];
 };
 
+const ensureOk = async (response, endpoint) => {
+  if (response.ok) {
+    return;
+  }
+
+  const body = await response.text();
+  throw new Error(`Crafty API request failed (${response.status}) on ${endpoint}: ${body.slice(0, 300)}`);
+};
+
 export async function getServers() {
-  const response = await fetch(`${config.craftyBaseUrl}/api/v2/servers`, {
+  const endpoint = '/api/v2/servers';
+  const response = await fetch(`${config.craftyBaseUrl}${endpoint}`, {
     headers: jsonHeaders,
     method: 'GET'
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Crafty API request failed (${response.status}): ${body.slice(0, 300)}`);
-  }
+  await ensureOk(response, endpoint);
 
   const payload = await response.json();
   return extractServerArray(payload).map(normalizeServer);
+}
+
+export async function getServerStats(serverId) {
+  const endpoint = `/api/v2/servers/${serverId}/stats`;
+  const response = await fetch(`${config.craftyBaseUrl}${endpoint}`, {
+    headers: jsonHeaders,
+    method: 'GET'
+  });
+
+  await ensureOk(response, endpoint);
+
+  return response.json();
 }

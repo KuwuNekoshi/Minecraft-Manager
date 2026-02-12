@@ -1,29 +1,118 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { getServers } from '../services/craftyApi.js';
-import { chunkLines, formatServerLine } from '../utils/discordFormat.js';
+import { getServers, getServerStats } from '../services/craftyApi.js';
+
+const SERVER_PORT_START = 25570;
+const SERVER_PORT_STEP = 2;
+const SERVER_HOST_PREFIX = 'server';
+const SERVER_HOST_DOMAIN = 'megamonner.dk';
+
+const toPlayers = (players) => {
+  if (Array.isArray(players)) {
+    return players;
+  }
+
+  if (typeof players === 'string') {
+    try {
+      const parsed = JSON.parse(players);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+const inferServerIpFromPort = (port) => {
+  if (!Number.isInteger(port) || port < SERVER_PORT_START) {
+    return 'Ukendt IP';
+  }
+
+  const offset = port - SERVER_PORT_START;
+  if (offset % SERVER_PORT_STEP !== 0) {
+    return `Port ${port}`;
+  }
+
+  const serverIndex = offset / SERVER_PORT_STEP + 1;
+  return `${SERVER_HOST_PREFIX}${serverIndex}.${SERVER_HOST_DOMAIN}:${port}`;
+};
+
+const statusPresentation = (stats) => {
+  if (stats.updating || stats.waiting_start) {
+    return { dot: '🟡', text: 'Updating' };
+  }
+
+  if (stats.crashed) {
+    return { dot: '🔴', text: 'Crashed' };
+  }
+
+  if (stats.running) {
+    return { dot: '🟢', text: 'Online' };
+  }
+
+  return { dot: '🔴', text: 'Offline' };
+};
+
+const buildServerField = (server, stats) => {
+  const version = stats.version || 'Ukendt version';
+  const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
+  const ip = inferServerIpFromPort(port);
+  const { dot, text } = statusPresentation(stats);
+  const online = Number.isFinite(Number(stats.online)) ? Number(stats.online) : 0;
+  const max = Number.isFinite(Number(stats.max)) ? Number(stats.max) : 0;
+  const players = toPlayers(stats.players);
+
+  const lines = [
+    `${server.name} (${ip}) | ${version}`,
+    `${dot} ${text}`,
+    `${online}/${max} Online`,
+    '**Players online:**',
+    players.length > 0 ? players.map((player) => `• ${player}`).join('\n') : '• Ingen spillere online'
+  ];
+
+  return {
+    name: '\u200b',
+    value: lines.join('\n')
+  };
+};
 
 export const command = {
   data: new SlashCommandBuilder()
     .setName('servers')
-    .setDescription('Show all registered Crafty servers and their current status.'),
+    .setDescription('Vis alle Megamonner servers med live status og spillere.'),
   async execute(interaction) {
     await interaction.deferReply();
 
     const servers = await getServers();
     if (servers.length === 0) {
-      await interaction.editReply('No servers were returned by the Crafty API.');
+      await interaction.editReply({
+        embeds: [
+          {
+            title: 'Megamonner Servers:',
+            description: 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.\n\nIngen servers blev fundet i Crafty API lige nu.'
+          }
+        ]
+      });
       return;
     }
 
-    const lines = servers.map(formatServerLine);
-    const chunks = chunkLines(lines, 8);
+    const statsList = await Promise.all(
+      servers.map(async (server) => ({
+        server,
+        stats: await getServerStats(server.id)
+      }))
+    );
+
+    const fields = statsList.map(({ server, stats }) => buildServerField(server, stats));
 
     await interaction.editReply({
-      content: `Found **${servers.length}** servers in Crafty.`,
-      embeds: chunks.map((chunk, index) => ({
-        title: `Server Overview ${chunks.length > 1 ? `(${index + 1}/${chunks.length})` : ''}`,
-        description: chunk.join('\n')
-      }))
+      embeds: [
+        {
+          title: 'Megamonner Servers:',
+          description: 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.',
+          fields
+        }
+      ]
     });
   }
 };

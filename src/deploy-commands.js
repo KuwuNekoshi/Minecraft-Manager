@@ -6,12 +6,13 @@ const rest = new REST({ version: '10' }).setToken(config.discordToken);
 const commands = getSlashCommandJson();
 
 async function deployCommands() {
-  console.log(`Deploying ${commands.length} slash commands to guild ${config.discordGuildId}...`);
+  const route = Routes.applicationGuildCommands(config.discordClientId, config.discordGuildId);
 
-  await rest.put(
-    Routes.applicationGuildCommands(config.discordClientId, config.discordGuildId),
-    { body: commands }
-  );
+  console.log(`Clearing old slash commands on guild ${config.discordGuildId} to remove lingering commands...`);
+  await rest.put(route, { body: [] });
+
+  console.log(`Deploying ${commands.length} slash commands to guild ${config.discordGuildId}...`);
+  await rest.put(route, { body: commands });
 
   console.log('Slash commands deployed successfully.');
 }
