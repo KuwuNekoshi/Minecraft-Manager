@@ -111,7 +111,7 @@ export const command = {
     .setName('servers')
     .setDescription('Vis alle Megamonner servers med live status og spillere.'),
   async execute(interaction) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     const servers = await getServers();
     if (servers.length === 0) {
