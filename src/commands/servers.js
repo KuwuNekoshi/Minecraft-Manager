@@ -5,6 +5,7 @@ const SERVER_PORT_START = 25570;
 const SERVER_PORT_STEP = 2;
 const SERVER_HOST_PREFIX = 'server';
 const SERVER_HOST_DOMAIN = 'megamonner.dk';
+const MAX_FIELDS_PER_EMBED = 25;
 
 const toPlayers = (players) => {
   if (Array.isArray(players)) {
@@ -53,6 +54,15 @@ const statusPresentation = (stats) => {
   return { dot: '🔴', text: 'Offline' };
 };
 
+const chunkBy = (items, size) => {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+
+  return chunks;
+};
+
 const buildServerField = (server, stats) => {
   const version = stats.version || 'Ukendt version';
   const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
@@ -62,18 +72,24 @@ const buildServerField = (server, stats) => {
   const max = Number.isFinite(Number(stats.max)) ? Number(stats.max) : 0;
   const players = toPlayers(stats.players);
 
-  const lines = [
-    `${server.name} (${ip}) | ${version}`,
-    `${dot} ${text}`,
-    `${online}/${max} Online`,
-    '**Players online:**',
-    players.length > 0 ? players.map((player) => `• ${player}`).join('\n') : '• Ingen spillere online'
-  ];
-
   return {
-    name: '\u200b',
-    value: lines.join('\n')
+    name: `${server.name} (${ip}) | ${version}`,
+    value: [
+      `${dot} ${text}`,
+      `${online}/${max} Online`,
+      '**Players online:**',
+      players.length > 0 ? players.map((player) => `• ${player}`).join('\n') : '• Ingen spillere online'
+    ].join('\n')
   };
+};
+
+const getServerStatsSafe = async (server) => {
+  try {
+    return await getServerStats(server.id);
+  } catch (error) {
+    console.error(`Failed to fetch stats for server ${server.id}:`, error);
+    return {};
+  }
 };
 
 export const command = {
@@ -99,20 +115,21 @@ export const command = {
     const statsList = await Promise.all(
       servers.map(async (server) => ({
         server,
-        stats: await getServerStats(server.id)
+        stats: await getServerStatsSafe(server)
       }))
     );
 
     const fields = statsList.map(({ server, stats }) => buildServerField(server, stats));
+    const fieldChunks = chunkBy(fields, MAX_FIELDS_PER_EMBED);
 
     await interaction.editReply({
-      embeds: [
-        {
-          title: 'Megamonner Servers:',
-          description: 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.',
-          fields
-        }
-      ]
+      embeds: fieldChunks.map((chunk, index) => ({
+        title: index === 0 ? 'Megamonner Servers:' : `Megamonner Servers: (${index + 1}/${fieldChunks.length})`,
+        description: index === 0
+          ? 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.'
+          : undefined,
+        fields: chunk
+      }))
     });
   }
 };
