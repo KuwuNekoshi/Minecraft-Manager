@@ -77,6 +77,29 @@ const chunkBy = (items, size) => {
   return chunks;
 };
 
+const getUnusedPortsLabel = (statsList) => {
+  const usedPorts = new Set(
+    statsList
+      .map(({ server, stats }) => {
+        const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
+        return Number.isInteger(port) ? port : null;
+      })
+      .filter((port) => Number.isInteger(port) && port >= SERVER_PORT_START && (port - SERVER_PORT_START) % SERVER_PORT_STEP === 0)
+  );
+
+  const maxPort = Math.max(...usedPorts, SERVER_PORT_START);
+  const unusedPorts = [];
+
+  for (let port = SERVER_PORT_START; port <= maxPort; port += SERVER_PORT_STEP) {
+    if (!usedPorts.has(port)) {
+      unusedPorts.push(port);
+    }
+  }
+
+  const unusedLabel = unusedPorts.length > 0 ? unusedPorts.join(', ') : 'Ingen';
+  return `-# Unused ports: ${unusedLabel}`;
+};
+
 const buildServerField = (server, stats) => {
   const version = stats.version || 'Ukendt version';
   const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
@@ -135,13 +158,17 @@ export const command = {
 
     const fields = statsList.map(({ server, stats }) => buildServerField(server, stats));
     const fieldChunks = chunkBy(fields, MAX_FIELDS_PER_EMBED);
+    const unusedPortsLabel = getUnusedPortsLabel(statsList);
 
     await interaction.editReply({
       embeds: fieldChunks.map((chunk, index) => ({
         title: index === 0 ? 'Megamonner Servers:' : `Megamonner Servers: (${index + 1}/${fieldChunks.length})`,
-        description: index === 0
-          ? 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.'
-          : undefined,
+        description: [
+          index === 0
+            ? 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.'
+            : null,
+          index === fieldChunks.length - 1 ? unusedPortsLabel : null
+        ].filter(Boolean).join('\n\n') || undefined,
         fields: chunk
       }))
     });
