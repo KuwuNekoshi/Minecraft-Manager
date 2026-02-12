@@ -198,10 +198,14 @@ export async function getServerStats(serverId) {
 
 export async function runServerConsoleCommand(serverId, command) {
   const endpoint = `/api/v2/servers/${serverId}/stdin`;
+  const commandText = String(command ?? '').trim();
   const response = await fetch(`${config.craftyBaseUrl}${endpoint}`, {
-    headers: jsonHeaders,
+    headers: {
+      Authorization: `Bearer ${config.craftyToken}`,
+      'Content-Type': 'text/plain'
+    },
     method: 'POST',
-    body: JSON.stringify({ command })
+    body: commandText
   });
 
   await ensureOk(response, endpoint);
