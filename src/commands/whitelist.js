@@ -1,5 +1,5 @@
-import { SlashCommandBuilder } from 'discord.js';
-import { getServerLogs, getServers, getWhitelistPlayers, runServerConsoleCommand } from '../services/craftyApi.js';
+import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { getServerLogs, getServers, runServerConsoleCommand } from '../services/craftyApi.js';
 
 const SUBCOMMANDS = ['enable', 'disable', 'list', 'add', 'remove'];
 const MAX_AUTOCOMPLETE_CHOICES = 25;
@@ -72,7 +72,7 @@ const parsePlayersFromConfirmation = (lines) => {
     return [];
   }
 
-  const match = text.match(/whitelisted players?:\s*(.*)/i);
+  const match = text.match(/whitelisted player(?:\(s\)|s)?:\s*(.*)/i);
   if (!match) {
     return [];
   }
@@ -172,7 +172,8 @@ const autocompleteRemovePlayerChoices = async (serverId, focused) => {
     return [];
   }
 
-  const players = await getWhitelistPlayers(serverId);
+  const confirmationLines = await executeWithLogConfirmation(serverId, 'whitelist list');
+  const players = parsePlayersFromConfirmation(confirmationLines);
   const lower = focused.toLowerCase();
 
   return players
@@ -180,6 +181,24 @@ const autocompleteRemovePlayerChoices = async (serverId, focused) => {
     .slice(0, MAX_AUTOCOMPLETE_CHOICES)
     .map((player) => ({ name: player, value: player }));
 };
+
+const withLogConfirmationBlock = (lines) => {
+  if (!lines || lines.length === 0) {
+    return '⚠️ No log confirmation was found yet.';
+  }
+
+  return `\`\`\`\n${lines.join('\n')}\n\`\`\``;
+};
+
+const buildWhitelistEmbed = ({ serverName, title, description, confirmationLines, color = 0x5865F2 }) => new EmbedBuilder()
+  .setColor(color)
+  .setTitle(title)
+  .setDescription(description)
+  .addFields({
+    name: 'Log confirmation',
+    value: withLogConfirmationBlock(confirmationLines)
+  })
+  .setFooter({ text: `Server: ${serverName}` });
 
 export const command = {
   data: new SlashCommandBuilder()
@@ -255,24 +274,56 @@ export const command = {
     const player = interaction.options.getString('player');
 
     if (!SUBCOMMANDS.includes(subcommand)) {
-      await interaction.editReply('Unsupported subcommand.');
+      await interaction.editReply({
+        embeds: [buildWhitelistEmbed({
+          serverName: 'Unknown',
+          title: 'Whitelist command failed',
+          description: 'Unsupported subcommand.',
+          confirmationLines: [] ,
+          color: 0xED4245
+        })]
+      });
       return;
     }
 
     const server = await findServerById(serverId);
     if (!server) {
-      await interaction.editReply(`Server not found for id: ${serverId}`);
+      await interaction.editReply({
+        embeds: [buildWhitelistEmbed({
+          serverName: 'Unknown',
+          title: 'Whitelist command failed',
+          description: `Server not found for id: ${serverId}`,
+          confirmationLines: [],
+          color: 0xED4245
+        })]
+      });
       return;
     }
 
     if ((subcommand === 'add' || subcommand === 'remove') && !player) {
-      await interaction.editReply('You must provide a player name.');
+      await interaction.editReply({
+        embeds: [buildWhitelistEmbed({
+          serverName: server.name,
+          title: 'Whitelist command failed',
+          description: 'You must provide a player name.',
+          confirmationLines: [],
+          color: 0xED4245
+        })]
+      });
       return;
     }
 
     const serverCommand = buildCommand({ subcommand, player });
     if (!serverCommand) {
-      await interaction.editReply('Could not build server command.');
+      await interaction.editReply({
+        embeds: [buildWhitelistEmbed({
+          serverName: server.name,
+          title: 'Whitelist command failed',
+          description: 'Could not build server command.',
+          confirmationLines: [],
+          color: 0xED4245
+        })]
+      });
       return;
     }
 
@@ -281,20 +332,36 @@ export const command = {
     if (subcommand === 'list') {
       const players = parsePlayersFromConfirmation(confirmationLines);
       const output = formatPlayerList(players);
-      const confirmation = confirmationLines.length > 0 ? `\n\n**Log confirmation:**\n${confirmationLines.join('\n')}` : '\n\n⚠️ No log confirmation was found yet.';
-      await interaction.editReply(`Whitelist for **${server.name}**\n${output}${confirmation}`);
+      await interaction.editReply({
+        embeds: [buildWhitelistEmbed({
+          serverName: server.name,
+          title: `Whitelist for ${server.name}`,
+          description: output,
+          confirmationLines
+        })]
+      });
       return;
     }
 
     if (confirmationLines.length === 0) {
-      await interaction.editReply(
-        `Executed on **${server.name}**: \`${serverCommand}\`\n\n⚠️ Command sent, but no matching confirmation lines were found in logs yet.`
-      );
+      await interaction.editReply({
+        embeds: [buildWhitelistEmbed({
+          serverName: server.name,
+          title: 'Whitelist command sent',
+          description: `Executed command: \`${serverCommand}\`\n\nCommand sent, but no matching confirmation lines were found in logs yet.`,
+          confirmationLines
+        })]
+      });
       return;
     }
 
-    await interaction.editReply(
-      `Executed on **${server.name}**: \`${serverCommand}\`\n\n**Log confirmation:**\n${confirmationLines.join('\n')}`
-    );
+    await interaction.editReply({
+      embeds: [buildWhitelistEmbed({
+        serverName: server.name,
+        title: 'Whitelist command executed',
+        description: `Executed command: \`${serverCommand}\``,
+        confirmationLines
+      })]
+    });
   }
 };
