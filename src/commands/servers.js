@@ -3,6 +3,8 @@ import { getServers, getServerStats } from '../services/craftyApi.js';
 
 const SERVER_PORT_START = 25570;
 const SERVER_PORT_STEP = 2;
+const UNUSED_PORT_RANGE_START = 25570;
+const UNUSED_PORT_RANGE_END = 25580;
 const SERVER_HOST_PREFIX = 'server';
 const SERVER_HOST_DOMAIN = 'megamonner.dk';
 const MAX_FIELDS_PER_EMBED = 25;
@@ -87,10 +89,9 @@ const getUnusedPortsLabel = (statsList) => {
       .filter((port) => Number.isInteger(port) && port >= SERVER_PORT_START && (port - SERVER_PORT_START) % SERVER_PORT_STEP === 0)
   );
 
-  const maxPort = Math.max(...usedPorts, SERVER_PORT_START);
   const unusedPorts = [];
 
-  for (let port = SERVER_PORT_START; port <= maxPort; port += SERVER_PORT_STEP) {
+  for (let port = UNUSED_PORT_RANGE_START; port <= UNUSED_PORT_RANGE_END; port += SERVER_PORT_STEP) {
     if (!usedPorts.has(port)) {
       unusedPorts.push(port);
     }
