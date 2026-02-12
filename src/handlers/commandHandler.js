@@ -9,6 +9,25 @@ export function registerCommandHandlers(client) {
   }
 
   client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isAutocomplete()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command?.autocomplete) {
+        await interaction.respond([]);
+        return;
+      }
+
+      try {
+        await command.autocomplete(interaction);
+      } catch (error) {
+        console.error(`Autocomplete error for /${interaction.commandName}:`, error);
+        if (!interaction.responded) {
+          await interaction.respond([]);
+        }
+      }
+
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) {
       return;
     }
