@@ -101,7 +101,7 @@ const getUnusedPortsField = (statsList) => {
   }
 
   return {
-    name: '-# **Unused IP/Ports**',
+    name: '**Unused IP/Ports**',
     value:
       unusedPorts.length > 0
         ? unusedPorts.map(({ ip, port }) => `-# IP: ${ip} - (Port: ${port})`).join('\n')
