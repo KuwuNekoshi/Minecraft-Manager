@@ -51,7 +51,7 @@ const inferServerIpFromPort = (port) => {
   }
 
   const serverIndex = offset / SERVER_PORT_STEP + 1;
-  return `${SERVER_HOST_PREFIX}${serverIndex}.${SERVER_HOST_DOMAIN}:${port}`;
+  return `${SERVER_HOST_PREFIX}${serverIndex}.${SERVER_HOST_DOMAIN}`;
 };
 
 const statusPresentation = (stats) => {
@@ -79,7 +79,7 @@ const chunkBy = (items, size) => {
   return chunks;
 };
 
-const getUnusedPortsLabel = (statsList) => {
+const getUnusedPortsField = (statsList) => {
   const usedPorts = new Set(
     statsList
       .map(({ server, stats }) => {
@@ -93,12 +93,20 @@ const getUnusedPortsLabel = (statsList) => {
 
   for (let port = UNUSED_PORT_RANGE_START; port <= UNUSED_PORT_RANGE_END; port += SERVER_PORT_STEP) {
     if (!usedPorts.has(port)) {
-      unusedPorts.push(port);
+      unusedPorts.push({
+        port,
+        ip: inferServerIpFromPort(port)
+      });
     }
   }
 
-  const unusedLabel = unusedPorts.length > 0 ? unusedPorts.join(', ') : 'Ingen';
-  return `-# Unused ports: ${unusedLabel}`;
+  return {
+    name: '-# **Unused IP/Ports**',
+    value:
+      unusedPorts.length > 0
+        ? unusedPorts.map(({ ip, port }) => `-# IP: ${ip} - (Port: ${port})`).join('\n')
+        : '-# Ingen ubrugte IP/Ports fundet.'
+  };
 };
 
 const buildServerField = (server, stats) => {
@@ -159,7 +167,13 @@ export const command = {
 
     const fields = statsList.map(({ server, stats }) => buildServerField(server, stats));
     const fieldChunks = chunkBy(fields, MAX_FIELDS_PER_EMBED);
-    const unusedPortsLabel = getUnusedPortsLabel(statsList);
+    const unusedPortsField = getUnusedPortsField(statsList);
+
+    if (fieldChunks.length === 0) {
+      fieldChunks.push([]);
+    }
+
+    fieldChunks[fieldChunks.length - 1].push(unusedPortsField);
 
     await interaction.editReply({
       embeds: fieldChunks.map((chunk, index) => ({
@@ -167,8 +181,7 @@ export const command = {
         description: [
           index === 0
             ? 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.'
-            : null,
-          index === fieldChunks.length - 1 ? unusedPortsLabel : null
+            : null
         ].filter(Boolean).join('\n\n') || undefined,
         fields: chunk
       }))
