@@ -13,6 +13,20 @@ const toPlayers = (players) => {
   }
 
   if (typeof players === 'string') {
+    const trimmed = players.trim();
+
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      const withoutBrackets = trimmed.slice(1, -1).trim();
+      if (!withoutBrackets) {
+        return [];
+      }
+
+      return withoutBrackets
+        .split(',')
+        .map((player) => player.trim().replace(/^['\"]|['\"]$/g, ''))
+        .filter(Boolean);
+    }
+
     try {
       const parsed = JSON.parse(players);
       return Array.isArray(parsed) ? parsed : [];
@@ -73,9 +87,10 @@ const buildServerField = (server, stats) => {
   const players = toPlayers(stats.players);
 
   return {
-    name: `${server.name} (${ip}) | ${version}`,
+    name: `${server.name} | ${version}`,
     value: [
-      `${dot} ${text}`,
+      `**IP:** ||\`${ip}\`||`,
+      `**Status** ${dot} ${text}`,
       `${online}/${max} Online`,
       '**Players online:**',
       players.length > 0 ? players.map((player) => `• ${player}`).join('\n') : '• Ingen spillere online'
