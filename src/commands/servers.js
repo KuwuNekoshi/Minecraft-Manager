@@ -1,4 +1,9 @@
-import { SlashCommandBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  SlashCommandBuilder
+} from 'discord.js';
 import { getServers, getServerStats } from '../services/craftyApi.js';
 
 const SERVER_PORT_START = 25570;
@@ -7,6 +12,7 @@ const UNUSED_PORT_RANGE_START = 25570;
 const UNUSED_PORT_RANGE_END = 25580;
 const SERVER_HOST_PREFIX = 'server';
 const SERVER_HOST_DOMAIN = 'megamonner.dk';
+const SERVER_MAP_HOST = 'servermap.megamonner.dk';
 const MAX_FIELDS_PER_EMBED = 25;
 
 const toPlayers = (players) => {
@@ -138,6 +144,27 @@ const getServerStatsSafe = async (server) => {
   }
 };
 
+const buildQuickConnectComponents = (statsList) => {
+  const buttons = statsList
+    .filter(({ stats }) => Boolean(stats.running))
+    .map(({ server, stats }) => {
+      const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
+
+      if (!Number.isInteger(port)) {
+        return null;
+      }
+
+      return new ButtonBuilder()
+        .setLabel(`${server.name} Map`)
+        .setStyle(ButtonStyle.Link)
+        .setURL(`https://${SERVER_MAP_HOST}:${port + 1}`);
+    })
+    .filter(Boolean);
+
+  const limitedButtons = buttons.slice(0, 25);
+  return chunkBy(limitedButtons, 5).map((buttonChunk) => new ActionRowBuilder().addComponents(buttonChunk));
+};
+
 export const command = {
   data: new SlashCommandBuilder()
     .setName('servers')
@@ -168,6 +195,7 @@ export const command = {
     const fields = statsList.map(({ server, stats }) => buildServerField(server, stats));
     const fieldChunks = chunkBy(fields, MAX_FIELDS_PER_EMBED);
     const unusedPortsField = getUnusedPortsField(statsList);
+    const quickConnectComponents = buildQuickConnectComponents(statsList);
 
     if (fieldChunks.length === 0) {
       fieldChunks.push([]);
@@ -184,7 +212,8 @@ export const command = {
             : null
         ].filter(Boolean).join('\n\n') || undefined,
         fields: chunk
-      }))
+      })),
+      components: quickConnectComponents
     });
   }
 };
