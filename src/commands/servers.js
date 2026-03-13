@@ -12,7 +12,7 @@ const UNUSED_PORT_RANGE_START = 25570;
 const UNUSED_PORT_RANGE_END = 25580;
 const SERVER_HOST_PREFIX = 'server';
 const SERVER_HOST_DOMAIN = 'megamonner.dk';
-const SERVER_MAP_HOST = 'servermap.megamonner.dk';
+const SERVER_MAP_HOST = 'http://servermap.megamonner.dk';
 const MAX_FIELDS_PER_EMBED = 25;
 
 const toPlayers = (players) => {
