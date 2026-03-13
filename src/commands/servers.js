@@ -157,7 +157,7 @@ const buildQuickConnectComponents = (statsList) => {
       return new ButtonBuilder()
         .setLabel(`${server.name} Map`)
         .setStyle(ButtonStyle.Link)
-        .setURL(`https://${SERVER_MAP_HOST}:${port + 1}`);
+        .setURL(`${SERVER_MAP_HOST}:${port + 1}`);
     })
     .filter(Boolean);
 
