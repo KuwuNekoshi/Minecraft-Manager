@@ -3,6 +3,9 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
   MessageFlags,
   SlashCommandBuilder
 } from 'discord.js';
@@ -176,46 +179,31 @@ const buildServerComponents = (server, stats) => {
   const lunarConnectUrl = getLunarConnectUrl(field.ip);
   const bluemapUrl = getBluemapUrl(port);
 
-  const components = [
-    {
-      kind: 'text',
-      content: `## ${field.name}\n${field.value}`
-    }
-  ];
-
+  const buttons = [];
   if (lunarConnectUrl) {
-    components.push({
-      kind: 'text',
-      content: '### Lunar Connect'
-    });
-    components.push({
-      kind: 'actionRow',
-      actionRow: new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel('Open Lunar Connect')
-          .setStyle(ButtonStyle.Link)
-          .setURL(lunarConnectUrl)
-      )
-    });
+    buttons.push(
+      new ButtonBuilder()
+        .setStyle(ButtonStyle.Link)
+        .setLabel('Lunar Connect')
+        .setEmoji({ name: '🌙' })
+        .setURL(lunarConnectUrl)
+    );
   }
 
   if (bluemapUrl) {
-    components.push({
-      kind: 'text',
-      content: '### World Map'
-    });
-    components.push({
-      kind: 'actionRow',
-      actionRow: new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel('Open Bluemap')
-          .setStyle(ButtonStyle.Link)
-          .setURL(bluemapUrl)
-      )
-    });
+    buttons.push(
+      new ButtonBuilder()
+        .setStyle(ButtonStyle.Link)
+        .setLabel('World Map')
+        .setEmoji({ name: '🌍' })
+        .setURL(bluemapUrl)
+    );
   }
 
-  return components;
+  return {
+    text: `## ${field.name}\n${field.value}`,
+    actionRow: buttons.length > 0 ? new ActionRowBuilder().addComponents(...buttons) : null
+  };
 };
 
 const buildUnusedPortsContent = (statsList) => {
@@ -224,29 +212,47 @@ const buildUnusedPortsContent = (statsList) => {
 };
 
 const buildComponentContainers = (statsList) => {
-  const serverComponents = statsList.flatMap(({ server, stats }) => buildServerComponents(server, stats));
+  const serverComponents = statsList.map(({ server, stats }) => buildServerComponents(server, stats));
   const chunkedComponents = chunkBy(serverComponents, MAX_SECTIONS_PER_CONTAINER);
 
   if (chunkedComponents.length === 0) {
     chunkedComponents.push([]);
   }
 
-  chunkedComponents[chunkedComponents.length - 1].push({ kind: 'text', content: buildUnusedPortsContent(statsList) });
+  chunkedComponents[chunkedComponents.length - 1].push({ text: buildUnusedPortsContent(statsList), actionRow: null });
 
   return chunkedComponents.map((items, index) => {
     const container = new ContainerBuilder();
 
     if (index === 0) {
-      container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(`# Megamonner Servers\n${DESCRIPTION_TEXT}`));
+      container
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`# Megamonner Servers\n${DESCRIPTION_TEXT}\n`)
+        )
+        .addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        );
     } else {
-      container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(`# Megamonner Servers (${index + 1}/${chunkedComponents.length})`));
+      container
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`# Megamonner Servers (${index + 1}/${chunkedComponents.length})\n`)
+        )
+        .addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        );
     }
 
     for (const item of items) {
-      if (item.kind === 'text') {
-        container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(item.content));
-      } else if (item.kind === 'actionRow') {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(item.text));
+
+      if (item.actionRow) {
         container.addActionRowComponents(item.actionRow);
+      }
+
+      if (item !== items[items.length - 1]) {
+        container.addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        );
       }
     }
 
