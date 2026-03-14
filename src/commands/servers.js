@@ -1,7 +1,9 @@
 import {
-  ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
+  MessageFlags,
+  SectionBuilder,
   SlashCommandBuilder
 } from 'discord.js';
 import { getServers, getServerStats } from '../services/craftyApi.js';
@@ -12,8 +14,8 @@ const UNUSED_PORT_RANGE_START = 25570;
 const UNUSED_PORT_RANGE_END = 25580;
 const SERVER_HOST_PREFIX = 'server';
 const SERVER_HOST_DOMAIN = 'megamonner.dk';
-const SERVER_MAP_HOST = 'http://servermap.megamonner.dk';
-const MAX_FIELDS_PER_EMBED = 25;
+const MAX_SECTIONS_PER_CONTAINER = 10;
+const DESCRIPTION_TEXT = 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.';
 
 const toPlayers = (players) => {
   if (Array.isArray(players)) {
@@ -144,25 +146,63 @@ const getServerStatsSafe = async (server) => {
   }
 };
 
-const buildQuickConnectComponents = (statsList) => {
-  const buttons = statsList
-    .filter(({ stats }) => Boolean(stats.running))
-    .map(({ server, stats }) => {
-      const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
+const getLunarConnectUrl = (ip) => {
+  if (!ip || ip === 'Ukendt IP' || ip.startsWith('Port ')) {
+    return null;
+  }
 
-      if (!Number.isInteger(port)) {
-        return null;
-      }
+  return `lunarclient://play?serverAddress=${encodeURIComponent(ip)}`;
+};
 
-      return new ButtonBuilder()
-        .setLabel(`${server.name} Map`)
+const buildServerSection = (server, stats) => {
+  const field = buildServerField(server, stats);
+  const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
+  const ip = inferServerIpFromPort(port);
+  const lunarConnectUrl = getLunarConnectUrl(ip);
+
+  const section = new SectionBuilder().addTextDisplayComponents((textDisplay) => textDisplay.setContent(`## ${field.name}\n${field.value}`));
+
+  if (lunarConnectUrl) {
+    section.setButtonAccessory(
+      new ButtonBuilder()
+        .setLabel('Lunar Connect')
         .setStyle(ButtonStyle.Link)
-        .setURL(`${SERVER_MAP_HOST}:${port + 1}`);
-    })
-    .filter(Boolean);
+        .setURL(lunarConnectUrl)
+    );
+  }
 
-  const limitedButtons = buttons.slice(0, 25);
-  return chunkBy(limitedButtons, 5).map((buttonChunk) => new ActionRowBuilder().addComponents(buttonChunk));
+  return section;
+};
+
+const buildUnusedPortsSection = (statsList) => {
+  const field = getUnusedPortsField(statsList);
+
+  return new SectionBuilder().addTextDisplayComponents((textDisplay) => textDisplay.setContent(`## ${field.name}\n${field.value}`));
+};
+
+const buildComponentContainers = (statsList) => {
+  const serverSections = statsList.map(({ server, stats }) => buildServerSection(server, stats));
+  const chunkedSections = chunkBy(serverSections, MAX_SECTIONS_PER_CONTAINER);
+
+  if (chunkedSections.length === 0) {
+    chunkedSections.push([]);
+  }
+
+  chunkedSections[chunkedSections.length - 1].push(buildUnusedPortsSection(statsList));
+
+  return chunkedSections.map((sections, index) => {
+    const container = new ContainerBuilder();
+
+    if (index === 0) {
+      container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(`# Megamonner Servers\n${DESCRIPTION_TEXT}`));
+    } else {
+      container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(`# Megamonner Servers (${index + 1}/${chunkedSections.length})`));
+    }
+
+    container.addSectionComponents(sections);
+
+    return container;
+  });
 };
 
 export const command = {
@@ -175,12 +215,7 @@ export const command = {
     const servers = await getServers();
     if (servers.length === 0) {
       await interaction.editReply({
-        embeds: [
-          {
-            title: 'Megamonner Servers:',
-            description: 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.\n\nIngen servers blev fundet i Crafty API lige nu.'
-          }
-        ]
+        content: `${DESCRIPTION_TEXT}\n\nIngen servers blev fundet i Crafty API lige nu.`
       });
       return;
     }
@@ -192,28 +227,11 @@ export const command = {
       }))
     );
 
-    const fields = statsList.map(({ server, stats }) => buildServerField(server, stats));
-    const fieldChunks = chunkBy(fields, MAX_FIELDS_PER_EMBED);
-    const unusedPortsField = getUnusedPortsField(statsList);
-    const quickConnectComponents = buildQuickConnectComponents(statsList);
-
-    if (fieldChunks.length === 0) {
-      fieldChunks.push([]);
-    }
-
-    fieldChunks[fieldChunks.length - 1].push(unusedPortsField);
+    const componentContainers = buildComponentContainers(statsList);
 
     await interaction.editReply({
-      embeds: fieldChunks.map((chunk, index) => ({
-        title: index === 0 ? 'Megamonner Servers:' : `Megamonner Servers: (${index + 1}/${fieldChunks.length})`,
-        description: [
-          index === 0
-            ? 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.'
-            : null
-        ].filter(Boolean).join('\n\n') || undefined,
-        fields: chunk
-      })),
-      components: quickConnectComponents
+      flags: MessageFlags.IsComponentsV2,
+      components: componentContainers
     });
   }
 };
