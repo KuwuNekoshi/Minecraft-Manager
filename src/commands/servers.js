@@ -1,9 +1,9 @@
 import {
+  ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
   MessageFlags,
-  SectionBuilder,
   SlashCommandBuilder
 } from 'discord.js';
 import { getServers, getServerStats } from '../services/craftyApi.js';
@@ -14,6 +14,7 @@ const UNUSED_PORT_RANGE_START = 25570;
 const UNUSED_PORT_RANGE_END = 25580;
 const SERVER_HOST_PREFIX = 'server';
 const SERVER_HOST_DOMAIN = 'megamonner.dk';
+const SERVER_MAP_HOST = 'servermap.megamonner.dk';
 const MAX_SECTIONS_PER_CONTAINER = 10;
 const DESCRIPTION_TEXT = 'Her er alle megamonner servers, hvis du vil lave din egen kan du få en bruger og logge ind til at styre din egen.';
 
@@ -128,6 +129,7 @@ const buildServerField = (server, stats) => {
 
   return {
     name: `${dot} ${server.name} | ${version}`,
+    ip,
     value: [
       `**Status:** ${text}`,
       `**IP:** \`${ip}\``,
@@ -160,52 +162,93 @@ const getLunarConnectUrl = (ip) => {
   return `https://megamonner.dk/lunar?serveraddress=${normalizedHost}`;
 };
 
-const buildServerSection = (server, stats) => {
-  const field = buildServerField(server, stats);
-  const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
-  const ip = inferServerIpFromPort(port);
-  const lunarConnectUrl = getLunarConnectUrl(ip);
-
-  const section = new SectionBuilder().addTextDisplayComponents((textDisplay) => textDisplay.setContent(`## ${field.name}\n${field.value}`));
-
-  if (lunarConnectUrl) {
-    section.setButtonAccessory(
-      new ButtonBuilder()
-        .setLabel('Lunar Connect')
-        .setStyle(ButtonStyle.Link)
-        .setURL(lunarConnectUrl)
-    );
+const getBluemapUrl = (port) => {
+  if (!Number.isInteger(port)) {
+    return null;
   }
 
-  return section;
+  return `https://${SERVER_MAP_HOST}:${port + 1}`;
 };
 
-const buildUnusedPortsSection = (statsList) => {
-  const field = getUnusedPortsField(statsList);
+const buildServerComponents = (server, stats) => {
+  const field = buildServerField(server, stats);
+  const port = Number.isInteger(stats.server_port) ? stats.server_port : server.port;
+  const lunarConnectUrl = getLunarConnectUrl(field.ip);
+  const bluemapUrl = getBluemapUrl(port);
 
-  return new SectionBuilder().addTextDisplayComponents((textDisplay) => textDisplay.setContent(`## ${field.name}\n${field.value}`));
+  const components = [
+    {
+      kind: 'text',
+      content: `## ${field.name}\n${field.value}`
+    }
+  ];
+
+  if (lunarConnectUrl) {
+    components.push({
+      kind: 'text',
+      content: '### Lunar Connect'
+    });
+    components.push({
+      kind: 'actionRow',
+      actionRow: new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Open Lunar Connect')
+          .setStyle(ButtonStyle.Link)
+          .setURL(lunarConnectUrl)
+      )
+    });
+  }
+
+  if (bluemapUrl) {
+    components.push({
+      kind: 'text',
+      content: '### World Map'
+    });
+    components.push({
+      kind: 'actionRow',
+      actionRow: new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Open Bluemap')
+          .setStyle(ButtonStyle.Link)
+          .setURL(bluemapUrl)
+      )
+    });
+  }
+
+  return components;
+};
+
+const buildUnusedPortsContent = (statsList) => {
+  const field = getUnusedPortsField(statsList);
+  return `## ${field.name}\n${field.value}`;
 };
 
 const buildComponentContainers = (statsList) => {
-  const serverSections = statsList.map(({ server, stats }) => buildServerSection(server, stats));
-  const chunkedSections = chunkBy(serverSections, MAX_SECTIONS_PER_CONTAINER);
+  const serverComponents = statsList.flatMap(({ server, stats }) => buildServerComponents(server, stats));
+  const chunkedComponents = chunkBy(serverComponents, MAX_SECTIONS_PER_CONTAINER);
 
-  if (chunkedSections.length === 0) {
-    chunkedSections.push([]);
+  if (chunkedComponents.length === 0) {
+    chunkedComponents.push([]);
   }
 
-  chunkedSections[chunkedSections.length - 1].push(buildUnusedPortsSection(statsList));
+  chunkedComponents[chunkedComponents.length - 1].push({ kind: 'text', content: buildUnusedPortsContent(statsList) });
 
-  return chunkedSections.map((sections, index) => {
+  return chunkedComponents.map((items, index) => {
     const container = new ContainerBuilder();
 
     if (index === 0) {
       container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(`# Megamonner Servers\n${DESCRIPTION_TEXT}`));
     } else {
-      container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(`# Megamonner Servers (${index + 1}/${chunkedSections.length})`));
+      container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(`# Megamonner Servers (${index + 1}/${chunkedComponents.length})`));
     }
 
-    container.addSectionComponents(sections);
+    for (const item of items) {
+      if (item.kind === 'text') {
+        container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(item.content));
+      } else if (item.kind === 'actionRow') {
+        container.addActionRowComponents(item.actionRow);
+      }
+    }
 
     return container;
   });
