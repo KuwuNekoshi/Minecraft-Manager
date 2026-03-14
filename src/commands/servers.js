@@ -151,7 +151,13 @@ const getLunarConnectUrl = (ip) => {
     return null;
   }
 
-  return `lunarclient://play?serverAddress=${encodeURIComponent(ip)}`;
+  const normalizedHost = String(ip).trim().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+
+  if (!normalizedHost) {
+    return null;
+  }
+
+  return `https://megamonner.dk/lunar?serveraddress=${normalizedHost}`;
 };
 
 const buildServerSection = (server, stats) => {
