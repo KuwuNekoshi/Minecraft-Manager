@@ -1,9 +1,9 @@
 import {
+  ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
   MessageFlags,
-  SectionBuilder,
   SlashCommandBuilder
 } from 'discord.js';
 import { getServers, getServerStats } from '../services/craftyApi.js';
@@ -179,21 +179,39 @@ const buildServerComponents = (server, stats) => {
   const components = [
     {
       kind: 'text',
-      content: `## ${field.name}\n${field.value}${lunarConnectUrl ? `\n**Lunar Connect:** ${lunarConnectUrl}` : ''}`
+      content: `## ${field.name}\n${field.value}`
     }
   ];
 
+  if (lunarConnectUrl) {
+    components.push({
+      kind: 'text',
+      content: '### Lunar Connect'
+    });
+    components.push({
+      kind: 'actionRow',
+      actionRow: new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Open Lunar Connect')
+          .setStyle(ButtonStyle.Link)
+          .setURL(lunarConnectUrl)
+      )
+    });
+  }
+
   if (bluemapUrl) {
     components.push({
-      kind: 'section',
-      section: new SectionBuilder()
-        .addTextDisplayComponents((textDisplay) => textDisplay.setContent('### World Map'))
-        .setButtonAccessory(
-          new ButtonBuilder()
-            .setLabel('Open Bluemap')
-            .setStyle(ButtonStyle.Link)
-            .setURL(bluemapUrl)
-        )
+      kind: 'text',
+      content: '### World Map'
+    });
+    components.push({
+      kind: 'actionRow',
+      actionRow: new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Open Bluemap')
+          .setStyle(ButtonStyle.Link)
+          .setURL(bluemapUrl)
+      )
     });
   }
 
@@ -227,8 +245,8 @@ const buildComponentContainers = (statsList) => {
     for (const item of items) {
       if (item.kind === 'text') {
         container.addTextDisplayComponents((textDisplay) => textDisplay.setContent(item.content));
-      } else {
-        container.addSectionComponents(item.section);
+      } else if (item.kind === 'actionRow') {
+        container.addActionRowComponents(item.actionRow);
       }
     }
 
